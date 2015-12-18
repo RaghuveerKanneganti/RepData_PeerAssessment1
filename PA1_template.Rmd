@@ -1,25 +1,155 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible Research - Peer Assessment 1"
+author: "Raghuveer Kanneganti"
+date: "December 17, 2015"
+output: html_document
 ---
+#### Introduction
+It is now possible to collect a large amount of data about personal movement using activity monitoring devices such as a Fitbit, Nike Fuelband, or Jawbone Up. These type of devices are part of the "quantified self" movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. But these data remain under-utilized both because the raw data are hard to obtain and there is a lack of statistical methods and software for processing and interpreting the data.
+
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
 
 
-## Loading and preprocessing the data
+### Loading and processing the data
 
 
+The data is fed into the program and the date column is set to 'Date' data type
 
-## What is mean total number of steps taken per day?
+```{r}
+activity = read.csv("./activity.csv")
+activity$date = as.Date(activity$date)
+```
 
+### What is mean total number of steps taken per day?
 
+The total number of steps taken per day, the mean and median are computed in the table below:
 
-## What is the average daily activity pattern?
+```{r, include=FALSE, cache=FALSE}
+library(dplyr)
 
+activityStats = activity %>% group_by(date) %>% summarize(count = n(),
+                StepsEachDay = sum(steps, na.rm = TRUE),
+                Mean = mean(steps,na.rm = TRUE),
+                Median = median(steps,na.rm = TRUE))
+```
+```{r}
+activityStats
+```
 
+The histogram of total number of steps taken each day
+```{r, echo = FALSE}
+plot(activityStats$date, activityStats$StepsEachDay,
+     type = "h",
+     xlab = "Date",
+     ylab = "Frequency",
+     col ="red",
+     main = "Total number of steps taken each day")
+```
 
-## Imputing missing values
+### What is the average daily activity pattern?
+The average number of steps taken for each of the 5-minute interval is computed acroos all days.
+```{r}
+avgDailyActivity = activity %>% group_by(interval) %>%
+    summarize(Mean = mean(steps, na.rm = TRUE))
 
+avgDailyActivity
+```
 
+The average daily activity pattern is show below.
+```{r, echo = FALSE}
+plot(avgDailyActivity$interval, avgDailyActivity$Mean, 
+     type = "l",
+     xlab = "Inteval",
+     ylab = "Average Daily Activity",
+     main = "Average Daily Activity Pattern ",
+     xaxt='n')
+axis(side = 1, at = avgDailyActivity$interval)
+box()
+```
 
-## Are there differences in activity patterns between weekdays and weekends?
+**Note**: The tic marks in the x-axis are not contineous as the interval sample duration in the given data is not uniform 
+
+On an average across all days in the dataset, `r avgDailyActivity[which.max(avgDailyActivity$Mean),1]` 5-minute interval contains maximum number of steps
+
+### Imputing missing values
+
+The total number of missing values in the data are `r nrow(activity[!complete.cases(activity),])`
+
+The missing values were reimputed with 0s and the copy for the new dataset is created
+```{r}
+activityReimputed = activity
+idx <- data.frame(which(is.na(activity), arr.ind=TRUE))
+for (i in idx$row){
+    activityReimputed[i,"steps"] = 0
+}
+```
+
+The dataset activityReimputed is equal to the original dataset but with the missing values re-imputed.The complete file can be found in the github directory.
+
+```{r}
+head(activityReimputed)
+```
+
+The mean and median total number of steps taken per day, using the reimputed dataset is below.
+```{r}
+activityStatsReimputed = activityReimputed %>% 
+                        group_by(date) %>% 
+                        summarize(count = n(),
+                                StepsEachDay = sum(steps, na.rm = TRUE),
+                                Mean = mean(steps,na.rm = TRUE),
+                                Median = median(steps,na.rm = TRUE))
+
+```
+
+The histogram of total number of steps taken per day
+```{r echo = FALSE}
+plot(activityStatsReimputed$date, activityStatsReimputed$StepsEachDay,
+     type = "h",
+     xlab = "Date",
+     ylab = "Frequency",
+     col = "blue",
+     main = "Total number of steps taken each day - NA's Reimputed")
+```
+
+### Are there differences in activity patterns between weekdays and weekends?
+
+In order to find if there are any differences in the activity patterns between weekdays and weekends, a new factor variable with two levels ("weekday" and "weekend") are added  indicating the given date is weekday or weekend day
+
+```{r}
+weekdays1 <- c('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday')
+
+activityReimputed$Day <- factor((weekdays(activityReimputed$date) %in% weekdays1), 
+                   levels=c(FALSE, TRUE), labels=c('weekend', 'weekday'))
+```
+
+A panel plot containing a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis) is plotted
+
+```{r echo = FALSE}
+activityStatsByDay = activityReimputed %>% group_by(Day, interval) %>% 
+    summarize(Mean = mean(steps, na.rm = TRUE))
+
+weekdaysData = activityStatsByDay[which(activityStatsByDay$Day=="weekday"),]
+
+weekendData = activityStatsByDay[which(activityStatsByDay$Day=="weekend"),]
+
+par(mfrow=c(2,1))
+plot(weekdaysData$interval, weekdaysData$Mean, 
+     type = "l",
+     xlab = "Inteval",
+     ylab = "Average Daily Activity",
+     main = "Average Daily Activity Pattern - Weekdays ",
+     xaxt='n',
+     ylim = c(0,200))
+axis(side = 1, at = weekdaysData$interval)
+box()
+
+plot(weekendData$interval, weekendData$Mean, 
+     type = "l",
+     xlab = "Inteval",
+     ylab = "Average Daily Activity",
+     main = "Average Daily Activity Pattern - Weekends",
+     xaxt='n',
+     ylim = c(0,200))
+axis(side = 1, at = weekdaysData$interval)
+box()
+```
